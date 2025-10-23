@@ -1,98 +1,209 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import domtoimage from 'dom-to-image';
+import * as MediaLibrary from 'expo-media-library';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { captureRef } from 'react-native-view-shot';
+import Button from '../components/Button';
+import CameraImagePicker from '../components/CameraImagePicker';
+import CircleButton from '../components/CircleButton';
+import EmojiList from '../components/EmojiList';
+import EmojiPicker from '../components/EmojiPicker';
+import EmojiSticker, { EmojiStickerRef } from '../components/EmojiSticker';
+import FrameSelector, { type Frame } from '../components/FrameSelector';
+import IconButton from '../components/IconButton';
+import ImageViewerAdvanced from '../components/ImageViewerAdvanced';
+import MLKitFaceDetector from '../components/MLKitFaceDetector';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const PlaceholderImage = require('@/assets/images/background-image.png');
 
-export default function HomeScreen() {
+export default function Index() {
+  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
+  const [showAppOptions, setShowAppOptions] = useState<boolean>(false);
+  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
+  const [isFrameModalVisible, setIsFrameModalVisible] = useState<boolean>(false);
+  const [isCameraPickerVisible, setIsCameraPickerVisible] = useState<boolean>(false);
+  const [pickedEmoji, setPickedEmoji] = useState<string | undefined>(undefined);
+  const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
+  const [faceDetectedImage, setFaceDetectedImage] = useState<string | undefined>(undefined);
+  const [useFaceDetection, setUseFaceDetection] = useState<boolean>(true);
+  const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
+
+  const imageRef = useRef<View>(null);
+  const stickerRef = useRef<EmojiStickerRef>(null);
+
+  useEffect(() => {
+    if (!permissionResponse?.granted) {
+      requestPermission();
+    }
+  }, []);
+
+  const pickImageAsync = async () => {
+    setIsCameraPickerVisible(true);
+  };
+
+  const handleImageSelected = (uri: string) => {
+    setSelectedImage(uri);
+    setShowAppOptions(true);
+    setUseFaceDetection(true);
+  };
+
+  const handleFaceDetected = (adjustedImageUri: string) => {
+    setFaceDetectedImage(adjustedImageUri);
+  };
+
+  const onReset = () => {
+    setShowAppOptions(false);
+    setSelectedImage(undefined);
+    setFaceDetectedImage(undefined);
+    setSelectedFrame(null);
+    setPickedEmoji(undefined);
+  };
+
+  const onAddSticker = () => {
+    setIsModalVisible(true);
+  };
+
+  const onAddFrame = () => {
+    setIsFrameModalVisible(true);
+  };
+
+  const onModalClose = () => {
+    setIsModalVisible(false);
+  };
+
+  const onFrameModalClose = () => {
+    setIsFrameModalVisible(false);
+  };
+
+  const onFrameSelect = (frame: Frame | null) => {
+    setSelectedFrame(frame);
+  };
+
+  const onSaveImageAsync = async () => {
+    if (Platform.OS !== 'web') {
+      try {
+        const localUri = await captureRef(imageRef, {
+          height: 440,
+          quality: 1,
+        });
+
+        await MediaLibrary.saveToLibraryAsync(localUri);
+        if (localUri) {
+          alert('Saved!');
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    } else {
+      try {
+        if (imageRef.current) {
+          const dataUrl = await domtoimage.toJpeg(imageRef.current as any, {
+            quality: 0.95,
+            width: 320,
+            height: 440,
+          });
+
+          let link = document.createElement('a');
+          link.download = 'sticker-smash.jpeg';
+          link.href = dataUrl;
+          link.click();
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
+    <GestureHandlerRootView style={styles.container}>
+      <View style={styles.imageContainer}>
+        <View ref={imageRef} collapsable={false}>
+          {useFaceDetection && selectedImage ? (
+            <MLKitFaceDetector
+              imageUri={selectedImage}
+              onFaceDetected={handleFaceDetected}
+              autoCenter={true}
             />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+          ) : (
+            <ImageViewerAdvanced
+              imgSource={PlaceholderImage}
+              selectedImage={faceDetectedImage || selectedImage}
+              frameUri={selectedFrame?.uri}
+              editable={showAppOptions}
+            />
+          )}
+          {pickedEmoji && (
+            <EmojiSticker 
+              ref={stickerRef}
+              emoji={pickedEmoji}
+              size={50}
+            />
+          )}
+        </View>
+      </View>
+      
+      {showAppOptions ? (
+        <View style={styles.optionsContainer}>
+          <View style={styles.optionsRow}>
+            <IconButton icon="refresh" label="Reset" onPress={onReset} />
+            <IconButton icon="crop" label="Khung" onPress={onAddFrame} />
+            <CircleButton onPress={onAddSticker} />
+            <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.footerContainer}>
+          <Button theme="primary" label="Chọn ảnh" onPress={pickImageAsync} />
+          <Button label="Sử dụng ảnh này" onPress={() => setShowAppOptions(true)} />
+        </View>
+      )}
+      <EmojiPicker isVisible={isModalVisible} onClose={onModalClose}>
+        <EmojiList onSelect={setPickedEmoji} onCloseModal={onModalClose} />
+      </EmojiPicker>
+      
+      <FrameSelector
+        isVisible={isFrameModalVisible}
+        onClose={onFrameModalClose}
+        onFrameSelect={onFrameSelect}
+        selectedFrame={selectedFrame}
+      />
+      
+      <CameraImagePicker
+        isVisible={isCameraPickerVisible}
+        onClose={() => setIsCameraPickerVisible(false)}
+        onImageSelected={handleImageSelected}
+      />
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  imageContainer: {
+    flex: 1,
+    paddingTop: 50,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  stickerContainer: {
     position: 'absolute',
+    top: 100,
+    left: 100,
+  },
+  footerContainer: {
+    flex: 1 / 3,
+    alignItems: 'center',
+  },
+  optionsContainer: {
+    position: 'absolute',
+    bottom: 80,
+  },
+  optionsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 15,
   },
 });
