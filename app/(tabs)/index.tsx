@@ -1,7 +1,8 @@
 import domtoimage from 'dom-to-image';
+import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureRef } from 'react-native-view-shot';
 import Button from '../components/Button';
@@ -27,6 +28,7 @@ export default function Index() {
   const [pickedEmoji, setPickedEmoji] = useState<string | undefined>(undefined);
   const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
   const [faceDetectedImage, setFaceDetectedImage] = useState<string | undefined>(undefined);
+  const [faceDetectedData, setFaceDetectedData] = useState<any>(null);
   const [useFaceDetection, setUseFaceDetection] = useState<boolean>(true);
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
 
@@ -49,8 +51,9 @@ export default function Index() {
     setUseFaceDetection(true);
   };
 
-  const handleFaceDetected = (adjustedImageUri: string) => {
+  const handleFaceDetected = (adjustedImageUri: string, faceData?: any) => {
     setFaceDetectedImage(adjustedImageUri);
+    setFaceDetectedData(faceData);
   };
 
   const onReset = () => {
@@ -79,6 +82,24 @@ export default function Index() {
 
   const onFrameSelect = (frame: Frame | null) => {
     setSelectedFrame(frame);
+  };
+
+  const onDeleteEmoji = () => {
+    Alert.alert(
+      'Xóa emoji',
+      'Bạn có muốn xóa emoji này không?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setPickedEmoji(undefined);
+          }
+        }
+      ]
+    );
   };
 
   const onSaveImageAsync = async () => {
@@ -123,6 +144,7 @@ export default function Index() {
           {useFaceDetection && selectedImage ? (
             <MLKitFaceDetector
               imageUri={selectedImage}
+              frameUri={selectedFrame?.uri}
               onFaceDetected={handleFaceDetected}
               autoCenter={true}
             />
@@ -132,6 +154,7 @@ export default function Index() {
               selectedImage={faceDetectedImage || selectedImage}
               frameUri={selectedFrame?.uri}
               editable={showAppOptions}
+              allowFrameDrag={true}
             />
           )}
           {pickedEmoji && (
@@ -139,6 +162,7 @@ export default function Index() {
               ref={stickerRef}
               emoji={pickedEmoji}
               size={50}
+              onDelete={onDeleteEmoji}
             />
           )}
         </View>
@@ -151,6 +175,9 @@ export default function Index() {
               <IconButton icon="refresh" label="Reset" onPress={onReset} />
               <IconButton icon="crop" label="Khung" onPress={onAddFrame} />
               <CircleButton onPress={onAddSticker} />
+              {pickedEmoji && (
+                <IconButton icon="delete" label="Xóa" onPress={onDeleteEmoji} />
+              )}
               <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
             </View>
           </View>
@@ -189,7 +216,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     flex: 1,
-    paddingTop: 50,
+    paddingTop: 40,
     paddingBottom: 20,
     justifyContent: 'center',
     alignItems: 'center',
@@ -200,7 +227,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     width: '100%',
   },
   stickerContainer: {
@@ -210,9 +237,9 @@ const styles = StyleSheet.create({
   },
   footerContainer: {
     alignItems: 'center',
-    gap: 10,
+    gap: 5,
     width: '100%',
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
   optionsContainer: {
     alignItems: 'center',
@@ -221,7 +248,7 @@ const styles = StyleSheet.create({
   optionsRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 15,
+    gap: 10,
     justifyContent: 'center',
     flexWrap: 'wrap',
   },

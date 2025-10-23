@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import EmojiSelector from 'react-native-emoji-selector';
+import EmojiSelector from 'react-native-emoji-modal';
 
 type Props = {
   onSelect: (emoji: string) => void;
@@ -8,8 +8,23 @@ type Props = {
 };
 
 export default function EmojiList({ onSelect, onCloseModal }: Props) {
-  const handleEmojiSelect = (emoji: string) => {
-    onSelect(emoji);
+  const handleEmojiSelect = (emoji: any) => {
+    console.log('Selected emoji:', emoji);
+    // Xử lý các định dạng emoji khác nhau
+    let emojiChar = '';
+    if (typeof emoji === 'string') {
+      emojiChar = emoji;
+    } else if (emoji.emoji) {
+      emojiChar = emoji.emoji;
+    } else if (emoji.char) {
+      emojiChar = emoji.char;
+    } else if (emoji.code) {
+      emojiChar = emoji.code;
+    } else {
+      emojiChar = '😀'; // fallback
+    }
+    
+    onSelect(emojiChar);
     onCloseModal();
   };
 
@@ -17,12 +32,7 @@ export default function EmojiList({ onSelect, onCloseModal }: Props) {
     <View style={styles.container}>
       <EmojiSelector
         onEmojiSelected={handleEmojiSelect}
-        showTabs={true}
-        showSearchBar={true}
-        showSectionTitles={true}
-        category={undefined}
         columns={8}
-        placeholder="Search..."
       />
     </View>
   );

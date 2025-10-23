@@ -60,6 +60,15 @@ const EmojiSticker = forwardRef<EmojiStickerRef, Props>(({ emoji, size = 50, onD
       savedRotation.value = 0;
     });
 
+  // Long press gesture for delete
+  const longPress = Gesture.LongPress()
+    .minDuration(800)
+    .onStart(() => {
+      if (onDelete) {
+        onDelete();
+      }
+    });
+
   // Pan gesture for dragging
   const drag = Gesture.Pan().onChange(event => {
     translateX.value += event.changeX;
@@ -67,7 +76,7 @@ const EmojiSticker = forwardRef<EmojiStickerRef, Props>(({ emoji, size = 50, onD
   });
 
   // Combined gestures - sử dụng Simultaneous để có thể drag + zoom + rotate cùng lúc
-  const composed = Gesture.Simultaneous(drag, pinchGesture, rotationGesture, doubleTap);
+  const composed = Gesture.Simultaneous(drag, pinchGesture, rotationGesture, doubleTap, longPress);
 
   const containerStyle = useAnimatedStyle(() => {
     const safeScale = Math.max(0.3, Math.min(3, scaleImage.value));

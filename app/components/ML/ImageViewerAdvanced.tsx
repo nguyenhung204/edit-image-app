@@ -15,6 +15,7 @@ type Props = {
   frameUri?: string;
   onImageTransform?: (scale: number, translateX: number, translateY: number) => void;
   editable?: boolean;
+  allowFrameDrag?: boolean;
 };
 
 /**
@@ -36,7 +37,8 @@ export default function ImageViewer({
   selectedImage, 
   frameUri,
   onImageTransform,
-  editable = true
+  editable = true,
+  allowFrameDrag = false
 }: Props) {
   const imageSource = selectedImage ? { uri: selectedImage } : imgSource;
   
@@ -46,6 +48,12 @@ export default function ImageViewer({
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  // Frame position for dragging
+  const frameTranslateX = useSharedValue(0);
+  const frameTranslateY = useSharedValue(0);
+  const savedFrameX = useSharedValue(0);
+  const savedFrameY = useSharedValue(0);
 
   const updateTransform = (newScale: number, newTranslateX: number, newTranslateY: number) => {
     if (onImageTransform) {
@@ -117,6 +125,19 @@ export default function ImageViewer({
       }
     });
 
+  // Frame drag gesture
+  const framePanGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      if (!allowFrameDrag) return;
+      frameTranslateX.value = savedFrameX.value + event.translationX;
+      frameTranslateY.value = savedFrameY.value + event.translationY;
+    })
+    .onEnd(() => {
+      if (!allowFrameDrag) return;
+      savedFrameX.value = frameTranslateX.value;
+      savedFrameY.value = frameTranslateY.value;
+    });
+
   const composedGesture = Gesture.Simultaneous(
     panGesture,
     pinchGesture,
@@ -139,6 +160,15 @@ export default function ImageViewer({
     };
   });
 
+  const frameAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: frameTranslateX.value },
+        { translateY: frameTranslateY.value },
+      ],
+    };
+  });
+
   return (
     <View style={styles.container}>
       <GestureDetector gesture={editable ? composedGesture : Gesture.Manual()}>
@@ -149,9 +179,11 @@ export default function ImageViewer({
       
       {/* Overlay khung ảnh */}
       {frameUri && (
-        <View style={styles.frameContainer}>
-          <Image source={{ uri: frameUri }} style={styles.frameImage} contentFit="cover" />
-        </View>
+        <GestureDetector gesture={allowFrameDrag ? framePanGesture : Gesture.Manual()}>
+          <Animated.View style={[styles.frameContainer, frameAnimatedStyle]}>
+            <Image source={{ uri: frameUri }} style={styles.frameImage} contentFit="cover" />
+          </Animated.View>
+        </GestureDetector>
       )}
     </View>
   );
@@ -180,7 +212,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    pointerEvents: 'none', // Cho phép tương tác với ảnh bên dưới
+    pointerEvents: 'auto', // Cho phép tương tác để kéo khung
   },
   frameImage: {
     width: '100%',
