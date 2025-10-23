@@ -5,15 +5,16 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { captureRef } from 'react-native-view-shot';
 import Button from '../components/Button';
-import CameraImagePicker from '../components/CameraImagePicker';
 import CircleButton from '../components/CircleButton';
 import EmojiList from '../components/EmojiList';
 import EmojiPicker from '../components/EmojiPicker';
 import EmojiSticker, { EmojiStickerRef } from '../components/EmojiSticker';
-import FrameSelector, { type Frame } from '../components/FrameSelector';
 import IconButton from '../components/IconButton';
-import ImageViewerAdvanced from '../components/ImageViewerAdvanced';
-import MLKitFaceDetector from '../components/MLKitFaceDetector';
+import CameraImagePicker from '../components/ML/CameraImagePicker';
+import FrameSelector from '../components/ML/FrameSelector';
+import ImageViewerAdvanced from '../components/ML/ImageViewerAdvanced';
+import MLKitFaceDetector from '../components/ML/MLKitFaceDetector';
+import { type Frame } from '../utils/FrameStorage';
 
 const PlaceholderImage = require('@/assets/images/background-image.png');
 
@@ -143,21 +144,23 @@ export default function Index() {
         </View>
       </View>
       
-      {showAppOptions ? (
-        <View style={styles.optionsContainer}>
-          <View style={styles.optionsRow}>
-            <IconButton icon="refresh" label="Reset" onPress={onReset} />
-            <IconButton icon="crop" label="Khung" onPress={onAddFrame} />
-            <CircleButton onPress={onAddSticker} />
-            <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
+      <View style={styles.controlsContainer}>
+        {showAppOptions ? (
+          <View style={styles.optionsContainer}>
+            <View style={styles.optionsRow}>
+              <IconButton icon="refresh" label="Reset" onPress={onReset} />
+              <IconButton icon="crop" label="Khung" onPress={onAddFrame} />
+              <CircleButton onPress={onAddSticker} />
+              <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
+            </View>
           </View>
-        </View>
-      ) : (
-        <View style={styles.footerContainer}>
-          <Button theme="primary" label="Chọn ảnh" onPress={pickImageAsync} />
-          <Button label="Sử dụng ảnh này" onPress={() => setShowAppOptions(true)} />
-        </View>
-      )}
+        ) : (
+          <View style={styles.footerContainer}>
+            <Button theme="primary" label="Chọn ảnh" onPress={pickImageAsync} />
+            <Button label="Sử dụng ảnh này" onPress={() => setShowAppOptions(true)} />
+          </View>
+        )}
+      </View>
       <EmojiPicker isVisible={isModalVisible} onClose={onModalClose}>
         <EmojiList onSelect={setPickedEmoji} onCloseModal={onModalClose} />
       </EmojiPicker>
@@ -187,6 +190,18 @@ const styles = StyleSheet.create({
   imageContainer: {
     flex: 1,
     paddingTop: 50,
+    paddingBottom: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  controlsContainer: {
+    minHeight: 120,
+    maxHeight: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    width: '100%',
   },
   stickerContainer: {
     position: 'absolute',
@@ -194,16 +209,20 @@ const styles = StyleSheet.create({
     left: 100,
   },
   footerContainer: {
-    flex: 1 / 3,
     alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    paddingHorizontal: 20,
   },
   optionsContainer: {
-    position: 'absolute',
-    bottom: 80,
+    alignItems: 'center',
+    width: '100%',
   },
   optionsRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 15,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
   },
 });

@@ -8,6 +8,9 @@
     "scheme": "editimage",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "developmentClient": {
+      "silentLaunch": true
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -26,8 +29,12 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
-      ]
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "package": "com.nguyenhung204.EditImage"
     },
     "web": {
       "output": "static",
@@ -47,11 +54,25 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos.",
+          "isAccessMediaLocationEnabled": true
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "39d8d9cc-a996-4e77-a4a3-c997b7f8b274"
+      }
     }
   }
 }

@@ -20,9 +20,14 @@ const styles = StyleSheet.create({
   iconButton: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minWidth: 60,
   },
   iconButtonLabel: {
     color: '#fff',
-    marginTop: 12,
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
