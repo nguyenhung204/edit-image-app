@@ -66,12 +66,33 @@ export default function ImageViewer({
       if (!editable) return;
       
       const newScale = savedScale.value * event.scale;
-      scale.value = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      
+      // Tính toán focal point tương đối với ảnh (không phải container)
+      const focalX = event.focalX - IMAGE_WIDTH / 2;
+      const focalY = event.focalY - IMAGE_HEIGHT / 2;
+      
+      // Tính toán translation để zoom từ focal point
+      const scaleDiff = clampedScale - savedScale.value;
+      const newTranslateX = savedTranslateX.value - focalX * scaleDiff / savedScale.value;
+      const newTranslateY = savedTranslateY.value - focalY * scaleDiff / savedScale.value;
+      
+      // Áp dụng giới hạn di chuyển
+      const scaledWidth = IMAGE_WIDTH * clampedScale;
+      const scaledHeight = IMAGE_HEIGHT * clampedScale;
+      const maxTranslateX = Math.max(0, (scaledWidth - IMAGE_WIDTH) / 2);
+      const maxTranslateY = Math.max(0, (scaledHeight - IMAGE_HEIGHT) / 2);
+      
+      scale.value = clampedScale;
+      translateX.value = Math.min(Math.max(newTranslateX, -maxTranslateX), maxTranslateX);
+      translateY.value = Math.min(Math.max(newTranslateY, -maxTranslateY), maxTranslateY);
     })
     .onEnd(() => {
       if (!editable) return;
       
       savedScale.value = scale.value;
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
       runOnJS(updateTransform)(scale.value, translateX.value, translateY.value);
     });
 
@@ -79,13 +100,14 @@ export default function ImageViewer({
     .onUpdate((event) => {
       if (!editable) return;
       
-      // Cho phép pan ngay cả khi scale = 1 để có trải nghiệm mượt hơn
+      // Chỉ cho phép pan khi đã zoom (scale > 1)
+      if (scale.value <= 1) return;
       
-      // Tính toán giới hạn di chuyển rộng hơn để xem được toàn bộ ảnh khi zoom
+      // Tính toán giới hạn di chuyển để ảnh không bị kéo ra ngoài container
       const scaledWidth = IMAGE_WIDTH * scale.value;
       const scaledHeight = IMAGE_HEIGHT * scale.value;
       
-      // Cho phép di chuyển tối đa bằng phần ảnh thừa ra khi zoom
+      // Giới hạn di chuyển: chỉ cho phép kéo đến khi viền ảnh chạm viền container
       const maxTranslateX = Math.max(0, (scaledWidth - IMAGE_WIDTH) / 2);
       const maxTranslateY = Math.max(0, (scaledHeight - IMAGE_HEIGHT) / 2);
       
@@ -154,9 +176,9 @@ export default function ImageViewer({
         { translateY: translateY.value },
         { scale: safeScale },
       ],
-      // Tăng kích thước container theo scale để không bị cắt ảnh
-      width: IMAGE_WIDTH * safeScale,
-      height: IMAGE_HEIGHT * safeScale,
+      // Giữ kích thước container cố định, chỉ scale nội dung
+      width: IMAGE_WIDTH,
+      height: IMAGE_HEIGHT,
     };
   });
 
@@ -194,7 +216,7 @@ const styles = StyleSheet.create({
     width: IMAGE_WIDTH,
     height: IMAGE_HEIGHT,
     position: 'relative',
-    overflow: 'hidden', // Giữ overflow hidden
+    overflow: 'hidden', // Giữ ảnh trong khung khi zoom
     borderRadius: 18,
   },
   imageContainer: {

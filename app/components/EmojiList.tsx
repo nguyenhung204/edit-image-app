@@ -21,7 +21,7 @@ export default function EmojiList({ onSelect, onCloseModal }: Props) {
     } else if (emoji.code) {
       emojiChar = emoji.code;
     } else {
-      emojiChar = '😀'; // fallback
+      emojiChar = '😀';
     }
     
     onSelect(emojiChar);

@@ -85,7 +85,7 @@ export default function FrameSelector({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        aspect: [4, 5.5], // Tỉ lệ phù hợp với khung ảnh
+        aspect: [4, 5.5], 
         quality: 1,
       });
 

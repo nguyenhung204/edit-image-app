@@ -24,7 +24,7 @@ type Props = {
 
 const IMAGE_WIDTH = 320;
 const IMAGE_HEIGHT = 440;
-const MIN_SCALE = 0.5;
+const MIN_SCALE = 1; // Không cho phép thu nhỏ dưới kích thước container
 const MAX_SCALE = 3;
 
 export default function MLKitFaceDetector({ 
@@ -68,6 +68,9 @@ export default function MLKitFaceDetector({
 
       // Sử dụng ML Kit để detect faces
       const detectedFaces = await FaceDetection.detect(imageUri, options);
+
+      console.log('Image:', IMAGE_HEIGHT, IMAGE_WIDTH);
+      console.log('Detected faces:', detectedFaces);
       
       setFaces(detectedFaces);
       setFaceDetectionSupported(true);
@@ -95,25 +98,56 @@ export default function MLKitFaceDetector({
 
   const centerFaceInImage = async (uri: string, face: Face): Promise<string> => {
     try {
+      // Get the original image dimensions first
+      const imageInfo = await ImageManipulator.manipulateAsync(uri, [], { 
+        format: ImageManipulator.SaveFormat.JPEG 
+      });
+      
       // ML Kit Face có structure: frame { left, top, width, height }
       const bounds = face.frame;
+      const originalWidth = imageInfo.width;
+      const originalHeight = imageInfo.height;
       
-      // Tính toán center của khuôn mặt
-      const faceCenterX = bounds.left + bounds.width / 2;
-      const faceCenterY = bounds.top + bounds.height / 2;
+      console.log('Original image dimensions:', originalWidth, 'x', originalHeight);
+      console.log('Face bounds:', bounds);
       
-      // Mở rộng vùng crop để bao gồm cả khuôn mặt và một phần xung quanh
-      const expandFactor = 4; // Tăng từ 1.8 lên 4 để lấy rộng hơn
-      const expandedWidth = bounds.width * expandFactor;
-      const expandedHeight = bounds.height * expandFactor;
+      // Ensure face bounds are within image bounds
+      const faceLeft = Math.max(0, Math.min(bounds.left, originalWidth));
+      const faceTop = Math.max(0, Math.min(bounds.top, originalHeight));
+      const faceRight = Math.max(faceLeft, Math.min(bounds.left + bounds.width, originalWidth));
+      const faceBottom = Math.max(faceTop, Math.min(bounds.top + bounds.height, originalHeight));
       
-      // Tính toán vị trí crop
+      // Recalculate face dimensions with bounds checking
+      const faceWidth = faceRight - faceLeft;
+      const faceHeight = faceBottom - faceTop;
+      
+      // Calculate face center
+      const faceCenterX = faceLeft + faceWidth / 2;
+      const faceCenterY = faceTop + faceHeight / 2;
+      
+      // Expand the crop area around the face
+      const expandFactor = 2.5; // Reduced from 4 to be more conservative
+      const expandedWidth = Math.min(faceWidth * expandFactor, originalWidth);
+      const expandedHeight = Math.min(faceHeight * expandFactor, originalHeight);
+      
+      // Calculate crop position, ensuring it stays within image bounds
       let cropX = faceCenterX - expandedWidth / 2;
       let cropY = faceCenterY - expandedHeight / 2;
       
-      // Đảm bảo crop không âm
-      cropX = Math.max(0, cropX);
-      cropY = Math.max(0, cropY);
+      // Adjust crop position to stay within image bounds
+      cropX = Math.max(0, Math.min(cropX, originalWidth - expandedWidth));
+      cropY = Math.max(0, Math.min(cropY, originalHeight - expandedHeight));
+      
+      // Ensure crop dimensions don't exceed image bounds
+      const finalWidth = Math.min(expandedWidth, originalWidth - cropX);
+      const finalHeight = Math.min(expandedHeight, originalHeight - cropY);
+      
+      console.log('Crop params:', {
+        originX: cropX, 
+        originY: cropY, 
+        width: finalWidth,
+        height: finalHeight 
+      });
       
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         uri,
@@ -122,8 +156,8 @@ export default function MLKitFaceDetector({
             crop: {
               originX: cropX,
               originY: cropY,
-              width: expandedWidth,
-              height: expandedHeight,
+              width: finalWidth,
+              height: finalHeight,
             },
           },
           {
@@ -192,11 +226,31 @@ export default function MLKitFaceDetector({
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       const newScale = savedScale.value * event.scale;
-      scale.value = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+      
+      // Tính toán focal point tương đối với container (trong khung 320x440)
+      const focalX = event.focalX - IMAGE_WIDTH / 2;
+      const focalY = event.focalY - IMAGE_HEIGHT / 2;
+      
+      // Tính toán translation để zoom từ focal point
+      const scaleDiff = clampedScale - savedScale.value;
+      const newTranslateX = savedImageX.value - focalX * scaleDiff / savedScale.value;
+      const newTranslateY = savedImageY.value - focalY * scaleDiff / savedScale.value;
+      
+      // Áp dụng giới hạn di chuyển để giữ ảnh trong khung
+      const scaledWidth = IMAGE_WIDTH * clampedScale;
+      const scaledHeight = IMAGE_HEIGHT * clampedScale;
+      const maxTranslateX = Math.max(0, (scaledWidth - IMAGE_WIDTH) / 2);
+      const maxTranslateY = Math.max(0, (scaledHeight - IMAGE_HEIGHT) / 2);
+      
+      scale.value = clampedScale;
+      imageTranslateX.value = Math.min(Math.max(newTranslateX, -maxTranslateX), maxTranslateX);
+      imageTranslateY.value = Math.min(Math.max(newTranslateY, -maxTranslateY), maxTranslateY);
     })
     .onEnd(() => {
       savedScale.value = scale.value;
-      // Notify parent about transform change
+      savedImageX.value = imageTranslateX.value;
+      savedImageY.value = imageTranslateY.value;
       if (onImagePositionChange) {
         onImagePositionChange(imageTranslateX.value, imageTranslateY.value);
       }
@@ -205,16 +259,24 @@ export default function MLKitFaceDetector({
   // Image drag gesture
   const imagePanGesture = Gesture.Pan()
     .onUpdate((event) => {
-      // Tính toán giới hạn di chuyển dựa trên scale
+      if (scale.value <= 1) {
+        // Khi scale = 1, không cho phép kéo
+        return;
+      }
+      
+      // Tính toán giới hạn di chuyển để đảm bảo ảnh luôn có phần hiển thị trong container
       const scaledWidth = IMAGE_WIDTH * scale.value;
       const scaledHeight = IMAGE_HEIGHT * scale.value;
       
+      // Giới hạn di chuyển: chỉ cho phép kéo đến khi viền ảnh chạm viền container
+      // Không cho kéo quá xa khiến ảnh biến mất hoàn toàn
       const maxTranslateX = Math.max(0, (scaledWidth - IMAGE_WIDTH) / 2);
       const maxTranslateY = Math.max(0, (scaledHeight - IMAGE_HEIGHT) / 2);
       
       const newTranslateX = savedImageX.value + event.translationX;
       const newTranslateY = savedImageY.value + event.translationY;
       
+      // Giới hạn chặt chẽ hơn để ảnh không bị kéo ra ngoài container
       imageTranslateX.value = Math.min(Math.max(newTranslateX, -maxTranslateX), maxTranslateX);
       imageTranslateY.value = Math.min(Math.max(newTranslateY, -maxTranslateY), maxTranslateY);
     })
@@ -233,7 +295,7 @@ export default function MLKitFaceDetector({
     .numberOfTaps(2)
     .onStart(() => {
       if (scale.value > 1) {
-        // Reset về scale = 1
+        // Reset về kích thước đầy container (scale = 1)
         scale.value = withSpring(1);
         imageTranslateX.value = withSpring(0);
         imageTranslateY.value = withSpring(0);
@@ -245,9 +307,9 @@ export default function MLKitFaceDetector({
           onImagePositionChange(0, 0);
         }
       } else {
-        // Zoom in đến 2x
-        scale.value = withSpring(2);
-        savedScale.value = 2;
+        // Zoom in đến 1.5x (giống ImageViewerAdvanced)
+        scale.value = withSpring(1.5);
+        savedScale.value = 1.5;
         // Notify parent about zoom
         if (onImagePositionChange) {
           onImagePositionChange(imageTranslateX.value, imageTranslateY.value);
@@ -262,7 +324,8 @@ export default function MLKitFaceDetector({
   );
 
   const imageAnimatedStyle = useAnimatedStyle(() => {
-    const safeScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale.value));
+    // Đảm bảo scale không bao giờ nhỏ hơn 1 (không thu nhỏ hơn container)
+    const safeScale = Math.max(1, Math.min(MAX_SCALE, scale.value));
     
     return {
       transform: [
@@ -270,8 +333,9 @@ export default function MLKitFaceDetector({
         { translateY: imageTranslateY.value },
         { scale: safeScale },
       ],
-      width: IMAGE_WIDTH * safeScale,
-      height: IMAGE_HEIGHT * safeScale,
+      // Giữ kích thước container cố định, chỉ scale nội dung
+      width: IMAGE_WIDTH,
+      height: IMAGE_HEIGHT,
     };
   });
 
@@ -363,7 +427,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: IMAGE_WIDTH,
     height: IMAGE_HEIGHT,
-    overflow: 'hidden',
+    overflow: 'hidden', // Giữ ảnh trong khung khi zoom
     borderRadius: 18,
   },
   imageContainer: {
